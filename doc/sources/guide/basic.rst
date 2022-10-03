@@ -6,11 +6,10 @@ Kivy Basics
 Installation of the Kivy environment
 ------------------------------------
 
-Kivy depends on many Python libraries, such as pygame, gstreamer, PIL,
+Kivy depends on many libraries, such as SDL2, gstreamer, PIL,
 Cairo, and more. They are not all required, but depending on the
-platform you're working on, they can be a pain to install. For
-Windows and MacOS X, we provide a portable package that you can just
-unzip and use.
+platform you're working on, they can be a pain to install. To ease your
+development process, we provide pre-packaged binaries for Windows, macOS and Linux.
 
 Have a look at one of these pages for detailed installation instructions:
 
@@ -21,7 +20,7 @@ Have a look at one of these pages for detailed installation instructions:
 
 Alternatively, instructions for the development version can be found here:
 
-* :ref:`installation`
+* :ref:`kivy-dev-install`
 
 .. _quickstart:
 
@@ -39,7 +38,7 @@ Creating a kivy application is as simple as:
 Here is an example of a minimal application::
 
     import kivy
-    kivy.require('1.0.6') # replace with your current kivy version !
+    kivy.require('2.1.0') # replace with your current kivy version !
 
     from kivy.app import App
     from kivy.uix.label import Label
@@ -65,7 +64,7 @@ First off, let's get familiar with the Kivy app life cycle.
 
 As you can see above, for all intents and purposes, our entry point into our App
 is the run() method, and in our case that is "MyApp().run()". We will get back
-to this, but let's start from the third line::
+to this, but let's start from the line::
 
     from kivy.app import App
 
@@ -108,7 +107,7 @@ This Label will be the Root Widget of this App.
 
 .. Note::
     Python uses indentation to denote code blocks, therefore take note that in
-    the code provided above, at line 12 the class and function definition ends.
+    the code provided above, at line 11 the class and function definition ends.
 
 Now on to the portion that will make our app run at line 14 and 15::
 
@@ -123,7 +122,7 @@ Running the application
 -----------------------
 To run the application, follow the instructions for your operating system:
 
-For Windows, Linux, OS X, or the RPi. From the :ref:`terminal<command-line>`
+For Windows, Linux, macOS, or the RPi. From the :ref:`terminal<command-line>`
 where you installed Kivy simply run::
 
     python main.py

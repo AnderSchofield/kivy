@@ -1,6 +1,26 @@
 #!/bin/bash
 set -e -x
 
+# manylinux SDL2
+MANYLINUX__SDL2__VERSION="2.24.0"
+MANYLINUX__SDL2__URL="https://github.com/libsdl-org/SDL/releases/download/release-$MANYLINUX__SDL2__VERSION/SDL2-$MANYLINUX__SDL2__VERSION.tar.gz"
+MANYLINUX__SDL2__FOLDER="SDL2-$MANYLINUX__SDL2__VERSION"
+
+# manylinux SDL2_image
+MANYLINUX__SDL2_IMAGE__VERSION="2.6.2"
+MANYLINUX__SDL2_IMAGE__URL="https://github.com/libsdl-org/SDL_image/releases/download/release-$MANYLINUX__SDL2_IMAGE__VERSION/SDL2_image-$MANYLINUX__SDL2_IMAGE__VERSION.tar.gz"
+MANYLINUX__SDL2_IMAGE__FOLDER="SDL2_image-2.6.2"
+
+# manylinux SDL2_mixer
+MANYLINUX__SDL2_MIXER__VERSION="2.6.2"
+MANYLINUX__SDL2_MIXER__URL="https://github.com/libsdl-org/SDL_mixer/releases/download/release-$MANYLINUX__SDL2_MIXER__VERSION/SDL2_mixer-$MANYLINUX__SDL2_MIXER__VERSION.tar.gz"
+MANYLINUX__SDL2_MIXER__FOLDER="SDL2_mixer-2.6.2"
+
+# manylinux SDL2_ttf
+MANYLINUX__SDL2_TTF__VERSION="2.20.1"
+MANYLINUX__SDL2_TTF__URL="https://github.com/libsdl-org/SDL_ttf/releases/download/release-$MANYLINUX__SDL2_TTF__VERSION/SDL2_ttf-$MANYLINUX__SDL2_TTF__VERSION.tar.gz"
+MANYLINUX__SDL2_TTF__FOLDER="SDL2_ttf-2.20.1"
+
 update_version_metadata() {
   current_time=$(python -c "from time import time; from os import environ; print(int(environ.get('SOURCE_DATE_EPOCH', time())))")
   date=$(python -c "from datetime import datetime; print(datetime.utcfromtimestamp($current_time).strftime('%Y%m%d'))")
@@ -64,7 +84,8 @@ prepare_env_for_unittest() {
 }
 
 install_kivy() {
-  python3 -m pip install -e "$(pwd)[dev,full]"
+  options=${1:-full,dev}
+  python3 -m pip install -e "$(pwd)[$options]"
 }
 
 
@@ -73,36 +94,42 @@ create_kivy_examples_wheel() {
 }
 
 install_kivy_examples_wheel() {
+  options=${1:-full,dev}
   root="$(pwd)"
   cd ~
   python3 -m pip install --pre --no-index --no-deps -f "$root/dist" "kivy_examples"
-  python3 -m pip install --pre -f "$root/dist" "kivy_examples[full,dev]"
+  python3 -m pip install --pre -f "$root/dist" "kivy_examples[$options]"
 }
 
 install_kivy_wheel() {
+  options=${1:-full,dev}
   root="$(pwd)"
   cd ~
-
   version=$(python3 -c "import sys; print('{}{}'.format(sys.version_info.major, sys.version_info.minor))")
   kivy_fname=$(ls "$root"/dist/Kivy-*$version*.whl | awk '{ print length, $0 }' | sort -n -s | cut -d" " -f2- | head -n1)
-  python3 -m pip install "${kivy_fname}[full,dev]"
+  python3 -m pip install "${kivy_fname}[$options]"
 }
 
 install_kivy_sdist() {
+  options=${1:-full,dev}
   root="$(pwd)"
   cd ~
 
   kivy_fname=$(ls $root/dist/Kivy-*.tar.gz)
-  python3 -m pip install "$kivy_fname[full,dev]"
+  python3 -m pip install "$kivy_fname[$options]"
 }
 
 test_kivy() {
   rm -rf kivy/tests/build || true
-  KIVY_NO_ARGS=1 python3 -m pytest --maxfail=10 --timeout=300 --cov=kivy --cov-report term --cov-branch "$(pwd)/kivy/tests"
+  # Tests with default environment variables.
+  env KIVY_NO_ARGS=1 python3 -m pytest --maxfail=10 --timeout=300 --cov=kivy --cov-branch --cov-report= "$(pwd)/kivy/tests"
+  # Logging tests, with non-default log modes
+  env KIVY_NO_ARGS=1 KIVY_LOG_MODE=PYTHON python3 -m pytest -m logmodepython --maxfail=10 --timeout=300 --cov=kivy --cov-append --cov-report= --cov-branch "$(pwd)/kivy/tests"
+  env KIVY_NO_ARGS=1 KIVY_LOG_MODE=MIXED python3 -m pytest -m logmodemixed --maxfail=10 --timeout=300 --cov=kivy --cov-append --cov-report=term --cov-branch "$(pwd)/kivy/tests"
 }
 
 test_kivy_benchmark() {
-  KIVY_NO_ARGS=1 python3 -m pytest "$(pwd)/kivy/tests" --benchmark-only
+  env KIVY_NO_ARGS=1 pytest --pyargs kivy.tests --benchmark-only
 }
 
 test_kivy_install() {
@@ -159,15 +186,59 @@ upload_docs_to_server() {
   fi
 }
 
-generate_manylinux2010_wheels() {
-  image=$1
+install_build_deps() {
+  yum install -y epel-release;
+  yum -y install autoconf automake cmake gcc gcc-c++ git make pkgconfig zlib-devel portmidi portmidi-devel xorg-x11-server-devel mesa-libEGL-devel mtdev-devel mesa-libEGL freetype freetype-devel openjpeg openjpeg-devel libpng libpng-devel libtiff libtiff-devel libwebp libwebp-devel dbus-devel dbus ibus-devel ibus libsamplerate-devel libsamplerate libudev-devel libmodplug-devel libmodplug libvorbis-devel libvorbis flac-devel flac libjpeg-turbo-devel libjpeg-turbo wget;
+}
 
-  python3 -m pip install twine
+build_and_install_linux_kivy_sys_deps() {
+  install_build_deps
+  mkdir ~/kivy_sources;
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/kivy_build/lib;
 
-  mkdir dist
-  chmod +x .ci/build-wheels-linux.sh
-  docker run --rm -v "$(pwd):/io" "$image" "/io/.ci/build-wheels-linux.sh"
-  sudo rm dist/*-linux*
+  pushd kivy_sources
+  curl -L "$MANYLINUX__SDL2__URL" -o "${MANYLINUX__SDL2__FOLDER}.tar.gz"
+  curl -L "$MANYLINUX__SDL2_MIXER__URL" -o "${MANYLINUX__SDL2_MIXER__FOLDER}.tar.gz"
+  curl -L "$MANYLINUX__SDL2_IMAGE__URL" -o "${MANYLINUX__SDL2_IMAGE__FOLDER}.tar.gz"
+  curl -L "$MANYLINUX__SDL2_TTF__URL" -o "${MANYLINUX__SDL2_TTF__FOLDER}.tar.gz"
+
+  echo "-- Build SDL2"
+  tar -xvf "${MANYLINUX__SDL2__FOLDER}.tar.gz"
+  pushd $MANYLINUX__SDL2__FOLDER
+  ./configure --prefix="$HOME/kivy_build" --bindir="$HOME/kivy_build/bin"  --enable-alsa-shared=no  --enable-jack-shared=no  --enable-pulseaudio-shared=no  --enable-esd-shared=no  --enable-arts-shared=no  --enable-nas-shared=no  --enable-sndio-shared=no  --enable-fusionsound-shared=no  --enable-libsamplerate-shared=no  --enable-wayland-shared=no --enable-x11-shared=no --enable-directfb-shared=no --enable-kmsdrm-shared=no;
+  make;
+  make install;
+  make distclean;
+  popd
+
+  echo "-- Build SDL2_mixer"
+  tar -xvf "${MANYLINUX__SDL2_MIXER__FOLDER}.tar.gz"
+  pushd $MANYLINUX__SDL2_MIXER__FOLDER
+  PATH="$HOME/kivy_build/bin:$PATH" PKG_CONFIG_PATH="$HOME/kivy_build/lib/pkgconfig" ./configure --prefix="$HOME/kivy_build" --bindir="$HOME/kivy_build/bin" --enable-music-mod-modplug-shared=no --enable-music-mod-mikmod-shared=no --enable-music-midi-fluidsynth-shared=no --enable-music-ogg-shared=no --enable-music-flac-shared=no --enable-music-mp3-mpg123-shared=no;
+  PATH="$HOME/kivy_build/bin:$PATH" make;
+  make install;
+  make distclean;
+  popd
+
+  echo "-- Build SDL2_image"
+  tar -xvf "${MANYLINUX__SDL2_IMAGE__FOLDER}.tar.gz"
+  pushd $MANYLINUX__SDL2_IMAGE__FOLDER
+  PATH="$HOME/kivy_build/bin:$PATH" PKG_CONFIG_PATH="$HOME/kivy_build/lib/pkgconfig" ./configure --prefix="$HOME/kivy_build" --bindir="$HOME/kivy_build/bin" --enable-png-shared=no --enable-jpg-shared=no --enable-tif-shared=no --enable-webp-shared=no;
+  PATH="$HOME/kivy_build/bin:$PATH" make;
+  make install;
+  make distclean;
+  popd
+
+  echo "-- Build SDL2_ttf"
+  tar -xvf "${MANYLINUX__SDL2_TTF__FOLDER}.tar.gz"
+  pushd $MANYLINUX__SDL2_TTF__FOLDER
+  PATH="$HOME/kivy_build/bin:$PATH" PKG_CONFIG_PATH="$HOME/kivy_build/lib/pkgconfig" ./configure --prefix="$HOME/kivy_build" --bindir="$HOME/kivy_build/bin";
+  PATH="$HOME/kivy_build/bin:$PATH" make;
+  make install;
+  make distclean;
+  popd
+
+  popd
 }
 
 generate_armv7l_wheels() {

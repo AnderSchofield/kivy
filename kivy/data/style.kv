@@ -29,16 +29,16 @@
 
 <BubbleContent>
     opacity: .7 if self.disabled else 1
-    rows: 1
+    orientation: "horizontal"
     canvas:
         Color:
-            rgba: self.parent.background_color if self.parent else (1, 1, 1, 1)
+            rgba: self.background_color
         BorderImage:
-            border: self.parent.border if self.parent else (16, 16, 16, 16)
-            texture: root.parent._bk_img.texture if root.parent else None
+            border: self.border
+            source: self.background_image
             size: self.size
             pos: self.pos
-            auto_scale: root.parent.border_auto_scale if self.parent else 'off'
+            auto_scale: self.border_auto_scale
 
 <BubbleButton>:
     background_normal: 'atlas://data/images/defaulttheme/bubble_btn'
@@ -190,6 +190,7 @@
             rgba:
                 (self.cursor_color
                 if self.focus and not self._cursor_blink
+                and int(self.x + self.padding[0]) <= self._cursor_visual_pos[0] <= int(self.x + self.width - self.padding[2])
                 else (0, 0, 0, 0))
         Rectangle:
             pos: self._cursor_visual_pos
@@ -198,6 +199,7 @@
             rgba: self.disabled_foreground_color if self.disabled else (self.hint_text_color if not self.text else self.foreground_color)
 
 <TextInputCutCopyPaste>:
+    content: content.__self__
     but_cut: cut.__self__
     but_copy: copy.__self__
     but_paste: paste.__self__
@@ -205,22 +207,24 @@
 
     size_hint: None, None
     size: '150sp', '50sp'
-    BubbleButton:
-        id: cut
-        text: 'Cut'
-        on_release: root.do('cut')
-    BubbleButton:
-        id: copy
-        text: 'Copy'
-        on_release: root.do('copy')
-    BubbleButton:
-        id: paste
-        text: 'Paste'
-        on_release: root.do('paste')
-    BubbleButton:
-        id: selectall
-        text: 'Select All'
-        on_release: root.do('selectall')
+    BubbleContent:
+        id: content
+        BubbleButton:
+            id: cut
+            text: 'Cut'
+            on_release: root.do('cut')
+        BubbleButton:
+            id: copy
+            text: 'Copy'
+            on_release: root.do('copy')
+        BubbleButton:
+            id: paste
+            text: 'Paste'
+            on_release: root.do('paste')
+        BubbleButton:
+            id: selectall
+            text: 'Select All'
+            on_release: root.do('selectall')
 
 <CodeInput>:
     font_name: 'data/fonts/RobotoMono-Regular.ttf'
@@ -831,6 +835,34 @@
         text: root.value or ''
         pos: root.pos
         font_size: '15sp'
+
+#:import kivy kivy
+<SettingColor>:
+    BoxLayout:
+        Label:
+            size_hint_x: None
+            width: 44
+            padding: (0, 5)
+            canvas.before:
+                # white border to see that there's a color tile at dark colors e.g. black
+                Color:
+                    rgba: (1,1,1,1.)
+                Line:
+                    rectangle: self.x,self.y,self.width,self.height
+                Color:
+                    rgba: kivy.utils.get_color_from_hex(root.value) if root.value else (1,1,1,1.)
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+        Label:
+            text: root.value or ''
+            pos: root.pos
+            font_size: '15sp'
+            text_size: self.size
+            valign: 'middle'
+            halign: 'center'
+            padding: (5,0)
 
 <SettingOptions>:
     Label:
