@@ -170,7 +170,8 @@ from kivy.uix.image import Image
 
 from kivy.properties import StringProperty, NumericProperty, \
     BooleanProperty, AliasProperty, OptionProperty, \
-    ListProperty, ObjectProperty, VariableListProperty, ColorProperty
+    ListProperty, ObjectProperty, VariableListProperty, ColorProperty, \
+    BoundedNumericProperty
 
 __all__ = ('TextInput', )
 
@@ -1386,8 +1387,10 @@ class TextInput(FocusBehavior, Widget):
             ):
                 cursor_x = i
                 break
+        else:
+            cursor_x = len(lines[cursor_y])
 
-        return int(cursor_x), int(cursor_y)
+        return cursor_x, cursor_y
 
     #
     # Selection control
@@ -1437,7 +1440,8 @@ class TextInput(FocusBehavior, Widget):
         self.scroll_x = scroll_x
         self.scroll_y = scroll_y
         # handle undo and redo for delete selection
-        self._set_unredo_delsel(a, b, text[a:b], from_undo)
+        if text[a:b]:
+            self._set_unredo_delsel(a, b, text[a:b], from_undo)
         self.cancel_selection()
         self.cursor = self.get_cursor_from_index(a)
 
@@ -1551,8 +1555,9 @@ class TextInput(FocusBehavior, Widget):
             if scroll_type == 'down':
                 if self.multiline:
                     if self.scroll_y > 0:
-                        self.scroll_y = max(0, self.scroll_y -
-                                            self.line_height)
+                        self.scroll_y = max(0,
+                                            self.scroll_y - self.line_height *
+                                            self.lines_to_scroll)
                         self._trigger_update_graphics()
                 else:
                     if self.scroll_x > 0:
@@ -1563,8 +1568,9 @@ class TextInput(FocusBehavior, Widget):
                 if self.multiline:
                     max_scroll_y = max(0, self.minimum_height - self.height)
                     if self.scroll_y < max_scroll_y:
-                        self.scroll_y = min(max_scroll_y, self.scroll_y +
-                                            self.line_height)
+                        self.scroll_y = min(max_scroll_y,
+                                            self.scroll_y + self.line_height *
+                                            self.lines_to_scroll)
                         self._trigger_update_graphics()
                 else:
                     minimum_width = (self._get_row_width(0) + self.padding[0] +
@@ -3839,6 +3845,17 @@ class TextInput(FocusBehavior, Widget):
 
     :attr:`line_spacing` is a :class:`~kivy.properties.NumericProperty` and
     defaults to 0.
+    '''
+
+    lines_to_scroll = BoundedNumericProperty(3, min=1)
+    '''Set how many lines will be scrolled at once when using the mouse scroll
+    wheel.
+
+    .. versionadded:: 2.2.0
+
+    :attr:`lines_to_scroll is a
+    :class:`~kivy.properties.BoundedNumericProperty` and defaults to 3, the
+    minimum is 1.
     '''
 
     input_filter = ObjectProperty(None, allownone=True)

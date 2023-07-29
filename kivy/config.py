@@ -249,6 +249,15 @@ Available configuration tokens
         :class:`~kivy.uix.behaviors.buttonbehavior.ButtonBehavior` to
         make sure they display their current visual state for the given
         time.
+    `always_on_top`: int, one of ``0`` or ``1``, defaults to ``0``
+        When enabled, the window will be brought to the front and will keep
+        the window above the rest. Only works for the sdl2 window provider.
+        ``0`` is disabled, ``1`` is enabled.
+    `show_taskbar_icon`: int, one of ``0`` or ``1``, defaults to ``1``
+        Determines whether the app's icon will be added to the taskbar. Only
+        applicable for the SDL2 window provider.
+        ``0`` means the icon will not be shown in the taskbar and ``1`` means
+        it will.
     `allow_screensaver`: int, one of 0 or 1, defaults to 1
         Allow the device to show a screen saver, or to go to sleep
         on mobile devices. Only works for the sdl2 window provider.
@@ -332,6 +341,10 @@ Available configuration tokens
     Check the specific module's documentation for a list of accepted
     arguments.
 
+.. versionadded:: 2.2.0
+    `always_on_top` have been added to the `graphics` section.
+    `show_taskbar_icon` have been added to the `graphics` section.
+
 .. versionchanged:: 2.2.0
     `implementation` has been added to the network section.
 
@@ -392,7 +405,7 @@ from kivy.utils import platform
 _is_rpi = exists('/opt/vc/include/bcm_host.h')
 
 # Version number of current configuration format
-KIVY_CONFIG_VERSION = 25
+KIVY_CONFIG_VERSION = 27
 
 Config = None
 '''The default Kivy configuration object. This is a :class:`ConfigParser`
@@ -490,7 +503,7 @@ class ConfigParser(PythonConfigParser, object):
         #    self.readfp(f)
         old_vals = {sect: {k: v for k, v in self.items(sect)} for sect in
                     self.sections()}
-        PythonConfigParser.read(self, filename)
+        PythonConfigParser.read(self, filename, encoding="utf-8-sig")
 
         # when reading new file, sections/keys are only increased, not removed
         f = self._do_callbacks
@@ -582,7 +595,7 @@ class ConfigParser(PythonConfigParser, object):
         if self.filename is None:
             return False
         try:
-            with open(self.filename, 'w') as fd:
+            with open(self.filename, 'w', encoding="utf-8") as fd:
                 PythonConfigParser.write(self, fd)
         except IOError:
             Logger.exception('Unable to write the config <%s>' % self.filename)
@@ -922,6 +935,12 @@ if not environ.get('KIVY_DOC_INCLUDE'):
 
         elif version == 24:
             Config.setdefault("network", "implementation", "default")
+
+        elif version == 25:
+            Config.setdefault('graphics', 'always_on_top', '0')
+
+        elif version == 26:
+            Config.setdefault("graphics", "show_taskbar_icon", "1")
 
         # WARNING: When adding a new version migration here,
         # don't forget to increment KIVY_CONFIG_VERSION !

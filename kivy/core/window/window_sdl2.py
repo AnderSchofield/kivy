@@ -214,6 +214,7 @@ class WindowSDL(WindowBase):
                   minimum_height=self._set_minimum_size)
 
         self.bind(allow_screensaver=self._set_allow_screensaver)
+        self.bind(always_on_top=self._set_always_on_top)
 
     def get_window_info(self):
         return self._win.get_window_info()
@@ -227,6 +228,9 @@ class WindowSDL(WindowBase):
             Logger.warning(
                 'Both Window.minimum_width and Window.minimum_height must be '
                 'bigger than 0 for the size restriction to take effect.')
+
+    def _set_always_on_top(self, *args):
+        self._win.set_always_on_top(self.always_on_top)
 
     def _set_allow_screensaver(self, *args):
         self._win.set_allow_screensaver(self.allow_screensaver)
@@ -286,7 +290,7 @@ class WindowSDL(WindowBase):
                     self.borderless = self._fake_fullscreen = False
             elif self.custom_titlebar:
                 if platform == 'win':
-                    # use custom behaviour
+                    # use custom behavior
                     # To handle aero snapping and rounded corners
                     self.borderless = False
         if self.fullscreen == 'fake':
@@ -309,31 +313,20 @@ class WindowSDL(WindowBase):
             resizable = Config.getboolean('graphics', 'resizable')
             state = (Config.get('graphics', 'window_state')
                      if self._is_desktop else None)
-            self.system_size = _size = self._win.setup_window(
+            self.system_size = self._win.setup_window(
                 pos[0], pos[1], w, h, self.borderless,
                 self.fullscreen, resizable, state,
                 self.get_gl_backend_name())
 
-            # calculate density/dpi
-            if platform == 'win':
-                from ctypes import windll
-                self._density = 1.
-                try:
-                    hwnd = windll.user32.GetActiveWindow()
-                    self.dpi = float(windll.user32.GetDpiForWindow(hwnd))
-                except AttributeError:
-                    pass
-            else:
-                sz = self._win._get_gl_size()[0]
-                self._density = density = sz / _size[0]
-                if self._is_desktop and self.size[0] != _size[0]:
-                    self.dpi = density * 96.
+            # We don't have a density or dpi yet set, so let's ask for an update
+            self._update_density_and_dpi()
 
             # never stay with a None pos, application using w.center
             # will be fired.
             self._pos = (0, 0)
             self._set_minimum_size()
             self._set_allow_screensaver()
+            self._set_always_on_top()
 
             if state == 'hidden':
                 self._focus = False
@@ -398,6 +391,20 @@ class WindowSDL(WindowBase):
             self._win_dpi_watch = _WindowsSysDPIWatch(window=self)
             self._win_dpi_watch.start()
 
+    def _update_density_and_dpi(self):
+        if platform == 'win':
+            from ctypes import windll
+            self._density = 1.
+            try:
+                hwnd = windll.user32.GetActiveWindow()
+                self.dpi = float(windll.user32.GetDpiForWindow(hwnd))
+            except AttributeError:
+                pass
+        else:
+            self._density = self._win._get_gl_size()[0] / self._size[0]
+            if self._is_desktop:
+                self.dpi = self._density * 96.
+
     def close(self):
         self._win.teardown_window()
         super(WindowSDL, self).close()
@@ -442,13 +449,6 @@ class WindowSDL(WindowBase):
             self._win.raise_window()
         else:
             Logger.warning('Window: show() is used only on desktop OSes.')
-
-    @deprecated
-    def toggle_fullscreen(self):
-        if self.fullscreen in (True, 'auto'):
-            self.fullscreen = False
-        else:
-            self.fullscreen = 'auto'
 
     def set_title(self, title):
         self._win.set_window_title(title)
@@ -665,6 +665,12 @@ class WindowSDL(WindowBase):
                     self._do_resize_ev = ev
                 else:
                     ev()
+            elif action == 'windowdisplaychanged':
+                Logger.info(f"WindowSDL: Window is now on display {args[0]}")
+
+                # The display has changed, so the density and dpi
+                # may have changed too.
+                self._update_density_and_dpi()
 
             elif action == 'windowmoved':
                 self.dispatch('on_move')
@@ -968,8 +974,6 @@ class _WindowsSysDPIWatch:
         from ctypes import windll
 
         if msg == WM_DPICHANGED:
-            ow, oh = self.window.size
-            old_dpi = self.window.dpi
 
             def clock_callback(*args):
                 if x_dpi != y_dpi:
@@ -977,10 +981,6 @@ class _WindowsSysDPIWatch:
                         'Can only handle DPI that are same for x and y')
 
                 self.window.dpi = x_dpi
-
-                # maintain the same window size
-                ratio = x_dpi / old_dpi
-                self.window.size = ratio * ow, ratio * oh
 
             x_dpi = wParam & 0xFFFF
             y_dpi = wParam >> 16
