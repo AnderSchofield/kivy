@@ -14,16 +14,15 @@ class KvApp(App):
         self.root = BoxLayout(orientation='horizontal')
 
         # Create a Text Input for KV code
-        self.kv_input = TextInput(size_hint_x=0.5)
+        self.kv_input = TextInput(size_hint_x=0.7)
         self.kv_input.bind(text=self.update)
         self.root.add_widget(self.kv_input)
 
         # Create widget placeholder
-        self.kv_display = Label(size_hint_x=0.5)
+        self.kv_display = Label(size_hint_x=0.3)
         self.root.add_widget(self.kv_display)
 
         return self.root
-
 
 # ... in the KvViewerApp class ...
 
